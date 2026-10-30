@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Conversations · Codex Bridge</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="Codex Bridge home"><span class="brand-mark">↗</span><span>Codex Bridge<small>YOUR LOCAL WORKSPACE</small></span></a>
+    <div class="sidebar-heading"><h2>Conversations</h2><span id="count" class="count">0</span></div>
+    <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search all messages" aria-label="Search conversations and messages"></label>
+    <nav id="conversations" aria-label="Conversations"></nav>
+    <footer class="sidebar-footer"><span class="local-icon">⌂</span><div>Stored on this Mac<small>Your history stays local.</small></div></footer>
+  </aside>
+  <main>
+    <header class="topbar"><span class="breadcrumb">WORKSPACE <span>/</span> CONVERSATIONS</span><span id="connection" class="connection" role="status">Connecting…</span></header>
+    <div id="error" class="error-banner" role="alert" hidden></div>
+    <section class="conversation-header">
+      <div class="eyebrow">TELEGRAM ↔ CODEX</div>
+      <div class="title-row"><h1 id="title">Your conversations, in one place.</h1><button id="export" class="export" disabled>↓ Export text</button></div>
+      <div class="details"><span id="status" class="status">Ready when you are</span><span id="meta">Messages and replies appear here automatically.</span></div>
+      <div id="session" class="session" hidden></div>
+    </section>
+    <section id="messages" class="messages" aria-label="Conversation messages">
+      <div class="empty"><div class="empty-icon">↗</div><h2>What would you like to work on?</h2><p>Send a message below or from Telegram.<br>Your request, Codex’s reply, and its status will appear here.</p><span>Conversations are saved on this Mac.</span></div>
+    </section>
+    <form id="composer" class="composer">
+      <label for="prompt">Message Codex</label>
+      <textarea id="prompt" placeholder="Ask Codex to work on your project… Type /model to change models." rows="3" maxlength="8000" disabled></textarea>
+      <div class="composer-actions"><span id="composer-hint" role="status">Connecting to the bridge…</span><div><button id="new-chat" type="button" disabled>New chat</button><button id="stop" type="button" hidden>Stop</button><button id="send" type="submit" disabled>Send ↗</button></div></div>
+      <p id="send-error" class="send-error" role="alert" hidden></p>
+    </form>
+    <footer class="bottom-bar"><span id="project">Local conversation archive</span><span>Dashboard + Telegram</span></footer>
+  </main>
+</body>
+</html>

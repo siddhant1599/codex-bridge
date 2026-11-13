@@ -9,6 +9,7 @@
     "check": "node --env-file-if-exists=.env src/main.js --check",
     "identify": "node --env-file-if-exists=.env src/main.js --identify",
     "dashboard": "node --env-file-if-exists=.env src/dashboard.js",
+    "voice:setup": "node --env-file-if-exists=.env src/voice-setup.js",
     "test": "node --test"
   }
 }

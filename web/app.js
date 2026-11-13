@@ -6,6 +6,7 @@ let lastMessageSignature = '';
 let lastListSignature = '';
 let submitting = false;
 let online = false;
+let draftInput = 'text';
 const labels = { idle: 'Ready', working: 'Working', completed: 'Completed', failed: 'Failed', interrupted: 'Interrupted', stopped: 'Stopped' };
 const date = value => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const time = value => new Date(value).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -34,7 +35,7 @@ function render() {
       const info = el('span', 'conversation-info');
       info.append(el('span', '', date(c.updatedAt)), el('b', '', labels[c.status] || c.status));
       button.append(info);
-      button.onclick = () => { selected = c.id; lastMessageSignature = ''; render(); };
+      button.onclick = () => { if (selected !== c.id) voice.cancel(); selected = c.id; lastMessageSignature = ''; render(); };
       $('conversations').append(button);
     }
     if (!filtered.length) $('conversations').append(el('p', 'no-results', query ? 'No conversations match your search.' : 'Your conversations will appear here.'));
@@ -68,6 +69,7 @@ function render() {
     article.append(el('div', 'avatar', message.role === 'user' ? 'Y' : message.role === 'assistant' ? '↗' : '·'));
     const content = el('div');
     const heading = el('div', 'message-heading', message.role === 'user' ? `You · ${message.source === 'dashboard' ? 'Dashboard' : 'Telegram'}` : message.role === 'assistant' ? 'Codex' : 'Bridge');
+    if (message.input === 'voice') heading.append(el('span', 'voice-label', 'Voice'));
     const timestamp = el('time', '', `${date(message.at)} · ${time(message.at)}`);
     timestamp.dateTime = message.at;
     heading.append(timestamp);
@@ -93,12 +95,14 @@ $('export').addEventListener('click', () => {
 function updateComposer() {
   const runtime = snapshot.runtime || {};
   const canSend = online && runtime.canSend && selected;
-  $('prompt').disabled = !canSend || submitting;
-  $('send').disabled = !canSend || submitting || runtime.working || !$('prompt').value.trim();
-  $('new-chat').disabled = !canSend || submitting || runtime.working;
+  $('attachments').disabled = !canSend || submitting || voice.active;
+  $('prompt').disabled = !canSend || submitting || voice.active;
+  $('send').disabled = !canSend || submitting || voice.active || runtime.working || (!$('prompt').value.trim() && !$('attachments').files.length) || $('prompt').value.length > 8000;
+  $('new-chat').disabled = !canSend || submitting || voice.active || runtime.working;
   $('stop').hidden = !runtime.working;
   $('stop').disabled = !canSend || submitting || selected !== snapshot.currentId;
   $('composer-hint').textContent = !online ? 'Bridge disconnected. Start npm start to reconnect.' : !runtime.canSend ? 'Archive mode. Run npm start to chat here.' : runtime.working ? 'Codex is working. You can draft your next message.' : 'Enter to send · Shift+Enter for a new line';
+  voice.update(runtime.voice, canSend && !submitting);
 }
 
 async function submitMessage(text, clearDraft = false) {
@@ -107,21 +111,30 @@ async function submitMessage(text, clearDraft = false) {
   $('send-error').hidden = true;
   updateComposer();
   try {
+    const files = clearDraft ? [...$('attachments').files] : [];
+    if (files.length > 3 || files.some(file => file.size > 10 * 1024 * 1024)) throw new Error('Choose up to three files, each under 10 MB.');
+    const attachments = await Promise.all(files.map(file => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ name: file.name, data: reader.result.split(',')[1] });
+      reader.onerror = () => reject(new Error('Could not read attachment.'));
+      reader.readAsDataURL(file);
+    })));
     const response = await fetch('/api/message', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Bridge-Request': '1' },
-      body: JSON.stringify({ text, conversationId: selected }), signal: AbortSignal.timeout(15000),
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Bridge-Request': '1', 'X-Bridge-Attachments': '1' },
+      body: JSON.stringify({ text, attachments, conversationId: selected, input: clearDraft ? draftInput : 'text' }), signal: AbortSignal.timeout(15000),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Message could not be sent.');
     selected = result.conversationId;
     lastMessageSignature = '';
-    if (clearDraft) $('prompt').value = '';
+    if (clearDraft) { $('attachments').value = ''; $('prompt').value = ''; draftInput = 'text'; }
     await refresh(false);
   } catch (error) {
     $('send-error').textContent = error instanceof TypeError || error.name === 'TimeoutError' ? 'Connection interrupted. Check conversation history before retrying; your message may already have been accepted.' : error.message;
     $('send-error').hidden = false;
   } finally { submitting = false; updateComposer(); if (!$('prompt').disabled) $('prompt').focus(); }
 }
+$('attachments').addEventListener('change', updateComposer);
 $('prompt').addEventListener('input', updateComposer);
 $('prompt').addEventListener('keydown', event => {
   if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
@@ -132,6 +145,21 @@ $('prompt').addEventListener('keydown', event => {
 $('composer').addEventListener('submit', event => { event.preventDefault(); if (!$('send').disabled) submitMessage($('prompt').value.trim(), true); });
 $('new-chat').addEventListener('click', () => submitMessage('/new'));
 $('stop').addEventListener('click', () => submitMessage('/stop'));
+
+const voice = new window.BridgeVoiceInput({
+  button: $('record-voice'), cancelButton: $('cancel-voice'), status: $('voice-status'),
+  onState: updateComposer,
+  onError: text => { $('send-error').textContent = text; $('send-error').hidden = false; },
+  onText: text => {
+    const combined = [$('prompt').value.trim(), text].filter(Boolean).join('\n');
+    $('prompt').value = combined;
+    draftInput = 'voice';
+    $('send-error').hidden = combined.length <= 8000;
+    if (combined.length > 8000) $('send-error').textContent = 'Your draft exceeds 8,000 characters. Shorten it before sending.';
+    updateComposer();
+    $('prompt').focus();
+  },
+});
 
 async function refresh(schedule = true) {
   try {

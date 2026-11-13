@@ -42,9 +42,10 @@ export class History {
     Object.assign(this.data.conversations.find(item => item.id === id), fields, { updatedAt: new Date().toISOString() });
     this.save();
   }
-  add(id, role, text, source = 'telegram') {
+  add(id, role, text, source = 'telegram', input = 'text') {
     const conversation = this.data.conversations.find(item => item.id === id);
     const message = { id: randomUUID(), role, text: this.redact(text), source, at: new Date().toISOString() };
+    if (input === 'voice') message.input = 'voice';
     conversation.messages.push(message);
     conversation.updatedAt = message.at;
     if (role === 'user' && !message.text.startsWith('/') && conversation.title === 'New conversation') conversation.title = message.text.replace(/\s+/g, ' ').slice(0, 85);

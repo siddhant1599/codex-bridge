@@ -70,6 +70,7 @@ After updating the files, stop the existing bridge with **Ctrl+C**, then run `np
 The dashboard includes:
 
 - A message box to send tasks to the selected conversation. Press Enter to send or Shift+Enter for a new line. New chat and Stop buttons manage the conversation and current request.
+- A Record voice button to dictate a message, review its transcript, and send it. Telegram voice notes appear in the same conversation history.
 - A conversation sidebar, with separate conversations after `/new` and matching saved conversations after `/resume`.
 - Search across titles and message text, timestamps, Codex session IDs, and request status.
 - Automatic refresh every two seconds; reading older messages does not force scrolling to the bottom.
@@ -83,6 +84,8 @@ To browse the archive while the bridge is stopped, run `npm run dashboard`. This
 The dashboard listens only on `127.0.0.1`, so it is accessible on this Mac, not directly from your phone. It does not publish history to a hosting service. When launched with `npm start`, you can send tasks from the dashboard or Telegram. Both use the same one-request-at-a-time runner. Sending to an older conversation resumes that conversation and makes it the active conversation for subsequent Telegram messages. Dashboard messages are echoed by the bot in Telegram as “You · Dashboard”, followed by bridge notices and Codex replies in order. Telegram messages are not echoed back a second time. Both interfaces show the same new exchanges; previously dashboard-only exchanges are not backfilled. If Telegram delivery fails, the message stays in dashboard history with a failure indicator and Codex continues working. The standalone `npm run dashboard` archive viewer remains read-only.
 
 ## Telegram commands
+
+Voice notes are also supported; see the setup below. Commands work as typed messages in either interface.
 
 | Command | Behavior |
 | --- | --- |
@@ -112,11 +115,32 @@ Model selection works in both the dashboard and Telegram while idle. Overrides a
 - Only the configured numeric user ID in a private chat can run commands. Group chats and other users are ignored.
 - Codex runs with `workspace-write` by default. Choose `read-only` in `.env` for inspection only. Approval policy is `never`: operations needing additional approval fail instead of waiting for a response. This version does not relay interactive approvals or stream tool output.
 - Telegram tokens are removed from the child process environment, and `.env` is ignored by Git. This is not secret isolation from Codex: it can read files permitted by its sandbox, including `.env` if this folder is its project. Use a separate project folder when appropriate.
-- `.bridge/state.json` stores the bot/owner/project binding, next Telegram update offset, and Codex session ID. `.bridge/last-response.txt` keeps the latest reply, including if delivery fails. Both use owner-only permissions.
+- `.bridge/state.json` stores the bot/owner/current-project binding, next Telegram update offset, and Codex session ID. `.bridge/last-response.txt` keeps the latest reply, including if delivery fails. Both use owner-only permissions. Changing `CODEX_WORKDIR` starts a fresh project conversation and preserves the previous project's conversation history. Changing the Telegram bot or allowed user requires reviewing the `.env` settings; startup won't silently switch who can access saved state.
 - Startup automatically removes a stale `.bridge/bridge.lock` when its recorded PID no longer exists, then opens the new connection. No manual cleanup is needed after a normal process crash. An active process, an uninspectable PID, or an invalid lock is preserved; the error explains what to check. Stop an active bridge with Ctrl+C in its original terminal before restarting. This does not delete conversation history or kill another process using the dashboard port. A Telegram 409 error can mean another poller is using the same bot.
 - Update offsets are saved **before** execution to avoid automatically replaying file-changing tasks after a crash. A crash between acceptance and execution can therefore lose a request. On restart, interrupted work is reported and not retried automatically. Network delivery failures are logged; the latest reply remains on disk.
 - `/stop` and timeouts terminate the child process group. They do not roll back changes. The default request timeout is 30 minutes.
-- Text only: voice notes, images, and attachments are not forwarded.
+- Voice notes are transcribed locally before being submitted as text. Documents and photos are supported as file attachments; see below.
+
+## Voice input
+
+Voice input uses [Whisper locally](https://github.com/openai/whisper) and FFmpeg on this Mac, without an API key or separate transcription charges. The default multilingual `base` model is about 140 MB. Telegram audio is downloaded from Telegram; dashboard audio is sent only to the local bridge. Transcripts are sent to Codex like typed messages. Replies remain text.
+
+One-time setup, from the bridge folder:
+
+```sh
+# Only needed if these tools are missing:
+brew install openai-whisper ffmpeg
+npm run voice:setup
+```
+
+Stop the bridge with Ctrl+C, restart with `npm start`, and refresh the dashboard. The setup command downloads and checks the speech model in `.bridge/voice-models`. It can take several minutes the first time. On this Mac, Whisper and FFmpeg were already installed.
+
+- **Dashboard:** click **Record voice**, allow microphone access, speak, then click **Finish recording**. Review the transcript in the message box and click **Send**. Existing draft text is preserved. **Cancel recording** cancels recording or transcription. Leaving the page or switching conversations cancels the recording too. Use the local dashboard URL printed by the bridge; microphone access requires localhost or HTTPS and a microphone connected to your Mac.
+- **Telegram:** record and send a normal voice note to your bot. The bridge transcribes it, echoes the transcript, and submits it automatically as your next task. The dashboard marks it **Voice**. `/stop` cancels transcription or the running Codex task; `/status` stays available. Sending a voice note while a task is running is rejected with a request to resend later.
+- Recordings are limited to **two minutes and 10 MB**. Only one transcription runs at a time. Empty, silent, oversized, and failed recordings do not start a Codex task. Speech recognition can make mistakes; use dashboard transcript review for tasks that need exact wording. Voice input accepts spoken tasks; bridge slash commands can still be typed or selected using dashboard buttons.
+- The bridge deletes temporary audio and transcription output after success, failure, or cancellation. Only submitted transcripts are saved in history. An abrupt process kill or power loss can leave private temporary files under `.bridge/voice-tmp`; remove that folder while the bridge is stopped if needed. Voice notes remain in Telegram under its normal retention rules.
+
+No `.env` changes are needed for the defaults. Optional settings are documented in `.env.example`: `VOICE_PROVIDER=off` disables voice; `VOICE_MODEL=tiny` is faster, `base` is the default, and `small` trades more time and memory for accuracy. After changing the model, run `npm run voice:setup` again. Set `VOICE_LANGUAGE=en` to force English, or leave it empty for language detection. `WHISPER_BIN`, `FFMPEG_BIN`, and `VOICE_MODEL_DIR` support custom installations. Local transcription runs on CPU and may take longer than the recording on slower Macs; it times out after five minutes.
 
 ## Development
 
@@ -124,6 +148,12 @@ Model selection works in both the dashboard and Telegram while idle. Overrides a
 npm test
 ```
 
-Tests cover access control, durable state, process locking, safe argument construction, real subprocess JSONL handling, failures/timeouts, Telegram response splitting, conversation persistence, dashboard request handling, and the complete message-to-history lifecycle. They use fake subprocesses, mocked Telegram responses, and a stubbed listener in the lifecycle test, so they need no credentials, listening ports, or model usage. Browser rendering and live network binding are separate manual checks.
+Tests cover access control, durable state, process locking, safe argument construction, real subprocess JSONL handling, failures/timeouts, Telegram response splitting, conversation persistence, dashboard request handling, and the complete message-to-history lifecycle. Voice tests also cover bounded downloads/uploads, microphone permission and cancellation flows, audio cleanup, subprocess cancellation, and Telegram transcript delivery without duplicate execution. They use fake subprocesses, mocked Telegram responses, a simulated browser recorder, and stubbed listeners, so they need no credentials, listening ports, speech models, or model usage. Browser rendering, real microphone permissions, and live Telegram delivery are separate manual checks.
 
 Sources: [Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode), [Codex authentication](https://learn.chatgpt.com/docs/auth), and [Telegram Bot API](https://core.telegram.org/bots/api).
+
+## File attachments
+
+Restart the bridge and refresh the dashboard after updating. In the dashboard, choose up to three files (10 MB each), optionally enter instructions, and click Send. In Telegram, send a document or photo with an optional caption. Send files while the bridge is idle; Telegram album items are handled individually, so send the next file after the reply.
+
+Files are stored with unique names under `.bridge-attachments` in CODEX_WORKDIR. Codex receives their local paths and can inspect them using its tools; support for particular formats depends on the tools available in your project. Filenames and paths appear in conversation history and dashboard messages mirrored to Telegram; file binaries are not mirrored back to Telegram. Stored files persist for follow-up tasks. Delete that folder when no longer needed, and exclude it from project commits if it contains private files.

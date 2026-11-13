@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="light">
   <title>Conversations · Codex Bridge</title>
   <link rel="stylesheet" href="/style.css">
+  <script src="/voice.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -31,6 +32,7 @@
     <form id="composer" class="composer">
       <label for="prompt">Message Codex</label>
       <textarea id="prompt" placeholder="Ask Codex to work on your project… Type /model to change models." rows="3" maxlength="8000" disabled></textarea>
+      <label for="attachments">Attach files (up to 3, 10 MB each)</label><input id="attachments" type="file" multiple><div class="voice-controls"><button id="record-voice" type="button" aria-pressed="false" disabled>Record voice</button><button id="cancel-voice" type="button" hidden>Cancel recording</button><span id="voice-status" role="status" aria-live="polite">Checking voice input…</span></div>
       <div class="composer-actions"><span id="composer-hint" role="status">Connecting to the bridge…</span><div><button id="new-chat" type="button" disabled>New chat</button><button id="stop" type="button" hidden>Stop</button><button id="send" type="submit" disabled>Send ↗</button></div></div>
       <p id="send-error" class="send-error" role="alert" hidden></p>
     </form>

@@ -3,18 +3,21 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { readHistory } from './history.js';
+import { audioExtension, MAX_AUDIO_BYTES, voiceError } from './voice.js';
 
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/voice.js', ['voice.js', 'text/javascript; charset=utf-8']],
   ['/style.css', ['style.css', 'text/css; charset=utf-8']],
 ]);
 
-export function dashboardHandler({ directory, port, runtime = () => ({ connected: false }), submit }) {
+export function dashboardHandler({ directory, port, runtime = () => ({ connected: false }), submit, transcribe }) {
   return async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Permissions-Policy', 'microphone=(self), camera=()');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     const host = `127.0.0.1:${typeof port === 'function' ? port() : port}`;
     const origin = `http://${host}`;
@@ -23,6 +26,33 @@ export function dashboardHandler({ directory, port, runtime = () => ({ connected
     }
     try {
       const path = new URL(req.url, origin).pathname;
+      if (req.method === 'POST' && path === '/api/transcribe') {
+        res.setHeader('Content-Type', 'application/json');
+        if (req.headers.origin !== origin || req.headers['x-bridge-request'] !== '1') {
+          res.writeHead(403).end(JSON.stringify({ error: 'Record voice messages from the local dashboard.' })); return;
+        }
+        const controller = new AbortController();
+        const cancel = () => { if (!res.writableEnded) controller.abort(); };
+        res.once?.('close', cancel);
+        try {
+          if (!transcribe) throw voiceError(503, 'Archive mode. Start npm start to use voice input.');
+          audioExtension(req.headers['content-type']);
+          if (Number(req.headers['content-length']) > MAX_AUDIO_BYTES) throw voiceError(413, 'Voice recordings must be smaller than 10 MB.');
+          const parts = [];
+          let size = 0;
+          for await (const part of req) {
+            size += part.length;
+            if (size > MAX_AUDIO_BYTES) throw voiceError(413, 'Voice recordings must be smaller than 10 MB.');
+            parts.push(Buffer.from(part));
+          }
+          if (!size) throw voiceError(400, 'The recording is empty. Please try again.');
+          const text = await transcribe(Buffer.concat(parts), req.headers['content-type'], { signal: controller.signal });
+          if (!controller.signal.aborted) res.end(JSON.stringify({ text }));
+        } catch (error) {
+          if (!controller.signal.aborted) res.writeHead(error.status || 500).end(JSON.stringify({ error: error.status ? error.message : 'Voice transcription failed. Check the bridge terminal.' }));
+        } finally { res.removeListener?.('close', cancel); }
+        return;
+      }
       if (req.method === 'POST' && path === '/api/message') {
         res.setHeader('Content-Type', 'application/json');
         if (req.headers.origin !== origin || req.headers['x-bridge-request'] !== '1' || req.headers['content-type'] !== 'application/json') {
@@ -32,11 +62,11 @@ export function dashboardHandler({ directory, port, runtime = () => ({ connected
         let body = '';
         for await (const chunk of req) {
           body += chunk;
-          if (Buffer.byteLength(body) > 16384) { res.writeHead(413).end(JSON.stringify({ error: 'Message is too long.' })); return; }
+          if (Buffer.byteLength(body) > (req.headers['x-bridge-attachments'] === '1' ? 43 * 1024 * 1024 : 16384)) { res.writeHead(413).end(JSON.stringify({ error: 'Message is too long.' })); return; }
         }
         let data;
         try { data = JSON.parse(body); } catch { res.writeHead(400).end(JSON.stringify({ error: 'Invalid message.' })); return; }
-        if (!data || typeof data.text !== 'string' || !data.text.trim() || data.text.length > 8000 || typeof data.conversationId !== 'string') {
+        if (!data || (data.attachments !== undefined && (!Array.isArray(data.attachments) || data.attachments.length > 3)) || typeof data.text !== 'string' || (!data.text.trim() && !data.attachments?.length) || data.text.length > 8000 || typeof data.conversationId !== 'string' || (data.input !== undefined && !['text', 'voice'].includes(data.input))) {
           res.writeHead(400).end(JSON.stringify({ error: 'Choose a conversation and enter a message of up to 8,000 characters.' })); return;
         }
         try { res.end(JSON.stringify(await submit(data))); }
@@ -56,9 +86,9 @@ export function dashboardHandler({ directory, port, runtime = () => ({ connected
   };
 }
 
-export async function startDashboard({ directory = resolve('.bridge'), port = Number(process.env.DASHBOARD_PORT || 8787), runtime = () => ({ connected: false }), submit } = {}) {
+export async function startDashboard({ directory = resolve('.bridge'), port = Number(process.env.DASHBOARD_PORT || 8787), runtime = () => ({ connected: false }), submit, transcribe } = {}) {
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('DASHBOARD_PORT must be a valid port number.');
-  const server = createServer(dashboardHandler({ directory, port: () => server.address().port, runtime, submit }));
+  const server = createServer({ requestTimeout: 30_000 }, dashboardHandler({ directory, port: () => server.address().port, runtime, submit, transcribe }));
   await new Promise((resolvePromise, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolvePromise); });
   return server;
 }

@@ -10,7 +10,7 @@ const assets = new Map([
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
   ['/voice.js', ['voice.js', 'text/javascript; charset=utf-8']],
   ['/style.css', ['style.css', 'text/css; charset=utf-8']],
-  ['/bridge-logo.jpg', ['bridge-logo.jpg', 'image/jpeg']],
+  ['/bridge-logo.webp', ['bridge-logo.webp', 'image/webp']],
 ]);
 
 export function dashboardHandler({ directory, port, runtime = () => ({ connected: false }), submit, transcribe }) {

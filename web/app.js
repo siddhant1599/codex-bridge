@@ -99,7 +99,14 @@ function render() {
   panel.replaceChildren();
   for (const message of c.messages) {
     const article = el('article', `message ${message.role}`);
-    article.append(el('div', 'avatar', message.role === 'user' ? 'Y' : message.role === 'assistant' ? '↗' : '·'));
+    const avatar = el('div', 'avatar', message.role === 'user' ? 'Y' : message.role === 'assistant' ? undefined : '·');
+    if (message.role === 'assistant') {
+      const logo = el('img', 'avatar-logo');
+      logo.src = '/bridge-logo.webp';
+      logo.alt = '';
+      avatar.append(logo);
+    }
+    article.append(avatar);
     const content = el('div');
     const heading = el('div', 'message-heading', message.role === 'user' ? `You · ${message.source === 'dashboard' ? 'Dashboard' : 'Telegram'}` : message.role === 'assistant' ? 'Codex' : 'Bridge');
     if (message.input === 'voice') heading.append(el('span', 'voice-label', 'Voice'));

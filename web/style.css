@@ -148,3 +148,4 @@ body,main{background:var(--sample-background);color:var(--sample-foreground)}
 .brand-mark{object-fit:cover;border-radius:50%;background:transparent}.connection:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#d85656;margin-right:7px}.connection.live:before{background:#42a96b}
 /* Lighter neutral surfaces improve separation in dark mode. */
 :root.dark{--sample-background:oklch(.305 0 0);--sample-card:oklch(.325 0 0);--sample-popover:oklch(.315 0 0);--sample-sidebar:oklch(.285 0 0);--sample-secondary:oklch(.37 0 0);--sample-muted:oklch(.345 0 0);--sample-accent:oklch(.395 0 0);--sample-sidebar-accent:oklch(.37 0 0);--sample-border:oklch(1 0 0 / 16%);--sample-input:oklch(1 0 0 / 22%)}
+.avatar-logo{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}

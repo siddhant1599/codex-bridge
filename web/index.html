@@ -3,37 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="light dark">
   <title>Conversations · Codex Bridge</title>
+  <link rel="icon" href="/bridge-logo.jpg" type="image/jpeg">
   <link rel="stylesheet" href="/style.css">
   <script src="/voice.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
   <aside class="sidebar">
-    <a class="brand" href="/" aria-label="Codex Bridge home"><span class="brand-mark">↗</span><span>Codex Bridge<small>YOUR LOCAL WORKSPACE</small></span></a>
+    <a class="brand" href="/" aria-label="Codex Bridge home"><img class="brand-mark" src="/bridge-logo.jpg" alt="" width="32" height="32"><span>Codex Bridge<small>PERSONAL WORKSPACE</small></span></a>
+    <button id="new-chat-sidebar" class="new-chat" type="button">＋ <span>New chat</span></button>
     <div class="sidebar-heading"><h2>Conversations</h2><span id="count" class="count">0</span></div>
     <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search all messages" aria-label="Search conversations and messages"></label>
     <nav id="conversations" aria-label="Conversations"></nav>
-    <footer class="sidebar-footer"><span class="local-icon">⌂</span><div>Stored on this Mac<small>Your history stays local.</small></div></footer>
+    <footer class="sidebar-footer"><label for="theme">Theme</label><select id="theme" aria-label="Color theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></footer>
   </aside>
   <main>
     <header class="topbar"><span class="breadcrumb">WORKSPACE <span>/</span> CONVERSATIONS</span><span id="connection" class="connection" role="status">Connecting…</span></header>
     <div id="error" class="error-banner" role="alert" hidden></div>
     <section class="conversation-header">
       <div class="eyebrow">TELEGRAM ↔ CODEX</div>
-      <div class="title-row"><h1 id="title">Your conversations, in one place.</h1><button id="export" class="export" disabled>↓ Export text</button></div>
+      <div class="title-row"><h1 id="title">What can I help with?</h1><button id="export" class="export" disabled>↓ Export</button></div>
       <div class="details"><span id="status" class="status">Ready when you are</span><span id="meta">Messages and replies appear here automatically.</span></div>
       <div id="session" class="session" hidden></div>
     </section>
     <section id="messages" class="messages" aria-label="Conversation messages">
-      <div class="empty"><div class="empty-icon">↗</div><h2>What would you like to work on?</h2><p>Send a message below or from Telegram.<br>Your request, Codex’s reply, and its status will appear here.</p><span>Conversations are saved on this Mac.</span></div>
+      <div class="empty"><div class="empty-icon">◈</div><h2>What would you like to work on?</h2><p>Ask Codex anything or choose a prompt to get started.</p><div class="suggestions"><button type="button" data-prompt="Explain how this project works">Explain this project</button><button type="button" data-prompt="Find and fix a bug in this project">Find and fix a bug</button><button type="button" data-prompt="Review this project and suggest improvements">Review my code</button></div></div>
     </section>
     <form id="composer" class="composer">
-      <label for="prompt">Message Codex</label>
-      <textarea id="prompt" placeholder="Ask Codex to work on your project… Type /model to change models." rows="3" maxlength="8000" disabled></textarea>
-      <label for="attachments">Attach files (up to 3, 10 MB each)</label><input id="attachments" type="file" multiple><div class="voice-controls"><button id="record-voice" type="button" aria-pressed="false" disabled>Record voice</button><button id="cancel-voice" type="button" hidden>Cancel recording</button><span id="voice-status" role="status" aria-live="polite">Checking voice input…</span></div>
-      <div class="composer-actions"><span id="composer-hint" role="status">Connecting to the bridge…</span><div><button id="new-chat" type="button" disabled>New chat</button><button id="stop" type="button" hidden>Stop</button><button id="send" type="submit" disabled>Send ↗</button></div></div>
+      <textarea id="prompt" placeholder="Message Codex..." rows="2" maxlength="8000" disabled aria-label="Message Codex"></textarea>
+      <div id="attachment-list" class="attachment-list"></div><input id="attachments" type="file" multiple hidden>
+      <div class="composer-actions"><div class="composer-tools"><label class="attach-button" for="attachments" title="Add files" aria-label="Add files">＋<span>Attach</span></label><button id="mode" type="button" disabled>Auto ▾</button><select id="model" aria-label="Choose a model" disabled><option>Default model</option></select><button id="record-voice" type="button" aria-pressed="false" disabled>🎙</button><button id="cancel-voice" type="button" hidden>Cancel</button></div><div class="composer-submit"><button id="stop" type="button" hidden>Stop</button><button id="send" type="submit" disabled>↑</button></div></div>
+      <p id="voice-status" class="voice-status" role="status" aria-live="polite"></p><p id="composer-hint" role="status">Connecting to the bridge…</p>
       <p id="send-error" class="send-error" role="alert" hidden></p>
     </form>
     <footer class="bottom-bar"><span id="project">Local conversation archive</span><span>Dashboard + Telegram</span></footer>

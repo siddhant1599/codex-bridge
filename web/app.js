@@ -1,4 +1,14 @@
 const $ = id => document.getElementById(id);
+const themeMedia = matchMedia('(prefers-color-scheme: dark)');
+const savedTheme = localStorage.getItem('bridge-theme');
+$('theme').value = ['light', 'dark', 'system'].includes(savedTheme) ? savedTheme : 'system';
+function applyTheme() {
+  const dark = $('theme').value === 'dark' || ($('theme').value === 'system' && themeMedia.matches);
+  document.documentElement.classList.toggle('dark', dark);
+}
+$('theme').addEventListener('change', () => { localStorage.setItem('bridge-theme', $('theme').value); applyTheme(); });
+themeMedia.addEventListener('change', applyTheme);
+applyTheme();
 const emptyContent = $('messages').firstElementChild.cloneNode(true);
 let snapshot = { conversations: [] };
 let selected = null;
@@ -15,6 +25,29 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+function formatMessage(text) {
+  const body = el('div', 'message-body');
+  const parts = String(text).split(/(```[^\n]*\n[\s\S]*?```)/g);
+  for (const part of parts) {
+    if (part.startsWith('```') && part.endsWith('```')) {
+      const lines = part.slice(3, -3).split('\n');
+      const pre = el('pre', 'message-code');
+      const code = el('code', '', lines.slice(1).join('\n').replace(/\n$/, ''));
+      pre.append(code); body.append(pre);
+    } else {
+      const block = el('div', 'message-text');
+      const tokens = part.split(/(`[^`\n]+`|\*\*[^*\n]+\*\*)/g);
+      for (const token of tokens) {
+        if (token.startsWith('**') && token.endsWith('**')) block.append(el('strong', '', token.slice(2, -2)));
+        else if (token.startsWith('`') && token.endsWith('`')) block.append(el('code', 'inline-code', token.slice(1, -1)));
+        else block.append(document.createTextNode(token));
+      }
+      body.append(block);
+    }
+  }
+  return body;
 }
 
 function render() {
@@ -73,7 +106,7 @@ function render() {
     const timestamp = el('time', '', `${date(message.at)} · ${time(message.at)}`);
     timestamp.dateTime = message.at;
     heading.append(timestamp);
-    content.append(heading, el('div', 'message-body', message.text));
+    content.append(heading, formatMessage(message.text));
     if (message.delivery === 'failed') content.append(el('div', 'delivery-error', 'Saved here · delivery to Telegram failed'));
     article.append(content);
     panel.append(article);
@@ -98,10 +131,30 @@ function updateComposer() {
   $('attachments').disabled = !canSend || submitting || voice.active;
   $('prompt').disabled = !canSend || submitting || voice.active;
   $('send').disabled = !canSend || submitting || voice.active || runtime.working || (!$('prompt').value.trim() && !$('attachments').files.length) || $('prompt').value.length > 8000;
-  $('new-chat').disabled = !canSend || submitting || voice.active || runtime.working;
+  $('new-chat-sidebar').disabled = !canSend || submitting || voice.active || runtime.working;
+  $('mode').disabled = !canSend || submitting || runtime.working;
+  $('model').disabled = !canSend || submitting || runtime.working;
+  const current = snapshot.conversations.find(item => item.id === selected);
+  $('mode').textContent = `${current?.agentMode || 'Auto'} ▾`;
+  const models = runtime.models || [];
+  const selectedModel = current?.model || runtime.defaultModel || '';
+  if ($('model').dataset.signature !== JSON.stringify(models.map(item => item.id))) {
+    $('model').replaceChildren(new Option('Default model', 'default'), ...models.map(item => new Option(item.name, item.id)));
+    $('model').dataset.signature = JSON.stringify(models.map(item => item.id));
+  }
+  $('model').value = models.some(item => item.id === selectedModel) ? selectedModel : 'default';
+  $('attachment-list').replaceChildren(...[...$('attachments').files].map((file, index) => {
+    const chip = el('span', 'file-chip');
+    chip.append(el('span', 'file-name', file.name));
+    const remove = el('button', 'file-remove', '×');
+    remove.type = 'button'; remove.setAttribute('aria-label', `Remove ${file.name}`); remove.disabled = !canSend || submitting;
+    remove.onclick = () => { const files = new DataTransfer(); [...$('attachments').files].forEach((item, i) => { if (i !== index) files.items.add(item); }); $('attachments').files = files.files; updateComposer(); };
+    chip.append(remove); return chip;
+  }));
+  $('send').textContent = '↑';
   $('stop').hidden = !runtime.working;
   $('stop').disabled = !canSend || submitting || selected !== snapshot.currentId;
-  $('composer-hint').textContent = !online ? 'Bridge disconnected. Start npm start to reconnect.' : !runtime.canSend ? 'Archive mode. Run npm start to chat here.' : runtime.working ? 'Codex is working. You can draft your next message.' : 'Enter to send · Shift+Enter for a new line';
+  $('composer-hint').textContent = !online ? 'Bridge disconnected. Start npm start to reconnect.' : !runtime.canSend ? 'Archive mode. Run npm start to chat here.' : runtime.working ? 'Codex is working. You can draft your next message.' : '';
   voice.update(runtime.voice, canSend && !submitting);
 }
 
@@ -143,7 +196,10 @@ $('prompt').addEventListener('keydown', event => {
   }
 });
 $('composer').addEventListener('submit', event => { event.preventDefault(); if (!$('send').disabled) submitMessage($('prompt').value.trim(), true); });
-$('new-chat').addEventListener('click', () => submitMessage('/new'));
+$('new-chat-sidebar').addEventListener('click', () => submitMessage('/new'));
+$('mode').addEventListener('click', () => { const c=snapshot.conversations.find(item=>item.id===selected); const mode=({auto:'coding',coding:'off',off:'auto'})[c?.agentMode||'auto']; submitMessage(`/agent ${mode}`); });
+$('model').addEventListener('change', () => submitMessage(`/model ${$('model').value}`));
+$('messages').addEventListener('click', event => { const button = event.target.closest('[data-prompt]'); if (!button || $('prompt').disabled) return; $('prompt').value = button.dataset.prompt; updateComposer(); $('prompt').focus(); });
 $('stop').addEventListener('click', () => submitMessage('/stop'));
 
 const voice = new window.BridgeVoiceInput({

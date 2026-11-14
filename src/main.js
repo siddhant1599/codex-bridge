@@ -95,7 +95,7 @@ async function main() {
     if (source !== 'dashboard') await delivery;
   };
   dashboard = await startDashboard({ directory,
-    runtime: () => ({ connected: !shuttingDown, canSend: !shuttingDown, telegramConnected, working: Boolean(running), defaultModel: cfg.model, project: cfg.cwd, bot: bot.username, voice: voice.status() }),
+    runtime: () => ({ connected: !shuttingDown, canSend: !shuttingDown, telegramConnected, working: Boolean(running), defaultModel: cfg.model, models: availableModels.map(({id,name})=>({id,name})), project: cfg.cwd, bot: bot.username, voice: voice.status() }),
     transcribe: (audio, type, options) => voice.transcribe(audio, type, options),
     submit: async ({ text, conversationId, input = 'text', attachments = [] }) => {
       const fail = (status, message) => { throw Object.assign(new Error(message), { status }); };

@@ -1,6 +1,15 @@
-# Telegram ↔ Codex bridge
+# Codex Bridge — agentic coding harness with voice control
 
-Message a private Telegram bot to run Codex in a project folder on your computer. The bridge uses your locally authenticated Codex CLI and remembers the conversation across messages and restarts. No npm dependencies, public server, or inbound port is needed: Telegram updates arrive through long polling.
+Codex Bridge is a locally hosted agentic coding harness for working with Codex from a web dashboard or a private Telegram bot. Give it a task by typing, attaching files, or speaking, and the bridge runs your locally authenticated Codex CLI in the project folder you choose. It keeps conversation history and can resume saved Codex sessions across messages and restarts.
+
+Voice control uses Whisper on your computer to turn dashboard recordings and Telegram voice notes into text. Review a dashboard transcript before sending it; Telegram voice notes are transcribed and submitted automatically. Voice transcription requires the one-time [local setup](#voice-input), but no transcription API key.
+
+- **Work from your browser or phone:** send tasks from the local dashboard or Telegram and follow the conversation in either interface.
+- **Use a coding agent:** the included `code-bot-sid` profile gives Codex coding instructions when appropriate. Choose the agent mode and model per conversation.
+- **Bring project context:** attach documents or images, select the project folder, and resume a saved session.
+- **Stay in control:** stop a running request, view saved history, and choose the Codex sandbox and timeout in your local configuration.
+
+The bridge has no npm dependencies and needs no public server or inbound port: Telegram updates arrive through long polling. Codex still operates within its configured permissions, and individual tool calls are not streamed to the dashboard.
 
 ## Setup
 

@@ -85,7 +85,10 @@ test('dashboard submissions validate origin, size, input, archive mode and busy 
   assert.equal((await post('x'.repeat(17000))).status, 413);
   assert.equal((await post(JSON.stringify({ conversationId: 'selected', text: 'busy' }))).status, 409);
   assert.equal((await post(body, {}, dashboardHandler({ directory, port: 8787 }))).status, 503);
-  assert.equal(submitted.length, 1);
+  const attached = JSON.stringify({ conversationId: 'selected', text: 'Inspect this screenshot', attachments: [{ name: 'image.png', data: Buffer.alloc(20000).toString('base64') }] });
+  assert.equal((await post(attached)).status, 200, 'Attachments over 16 KB must work without a special size-limit header');
+  assert.equal(submitted.length, 2);
+
 });
 
 test('bridge handles Telegram and dashboard requests, including resuming a selected older conversation', async t => {

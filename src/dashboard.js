@@ -10,6 +10,7 @@ const assets = new Map([
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
   ['/voice.js', ['voice.js', 'text/javascript; charset=utf-8']],
   ['/style.css', ['style.css', 'text/css; charset=utf-8']],
+  ['/bridge-logo.jpg', ['bridge-logo.jpg', 'image/jpeg']],
 ]);
 
 export function dashboardHandler({ directory, port, runtime = () => ({ connected: false }), submit, transcribe }) {
@@ -62,10 +63,10 @@ export function dashboardHandler({ directory, port, runtime = () => ({ connected
         let body = '';
         for await (const chunk of req) {
           body += chunk;
-          if (Buffer.byteLength(body) > (req.headers['x-bridge-attachments'] === '1' ? 43 * 1024 * 1024 : 16384)) { res.writeHead(413).end(JSON.stringify({ error: 'Message is too long.' })); return; }
+          if (Buffer.byteLength(body) > 43 * 1024 * 1024) { res.writeHead(413).end(JSON.stringify({ error: 'Attachments are too large. Choose up to three files, each under 10 MB.' })); return; }
         }
         let data;
-        try { data = JSON.parse(body); } catch { res.writeHead(400).end(JSON.stringify({ error: 'Invalid message.' })); return; }
+        try { data = JSON.parse(body); } catch { res.writeHead(Buffer.byteLength(body) > 16384 ? 413 : 400).end(JSON.stringify({ error: 'Invalid message upload. Refresh the dashboard and try again.' })); return; }
         if (!data || (data.attachments !== undefined && (!Array.isArray(data.attachments) || data.attachments.length > 3)) || typeof data.text !== 'string' || (!data.text.trim() && !data.attachments?.length) || data.text.length > 8000 || typeof data.conversationId !== 'string' || (data.input !== undefined && !['text', 'voice'].includes(data.input))) {
           res.writeHead(400).end(JSON.stringify({ error: 'Choose a conversation and enter a message of up to 8,000 characters.' })); return;
         }

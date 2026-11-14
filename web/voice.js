@@ -18,7 +18,7 @@ window.BridgeVoiceInput = class {
     this.button.setAttribute('aria-pressed', String(this.session?.phase === 'recording'));
     this.cancelButton.hidden = !this.active;
     if (!this.active) {
-      this.status.textContent = !supported ? 'Microphone recording needs a supported browser on localhost or HTTPS.' : settings.reason || 'Record up to two minutes, review the transcript, then send.';
+      this.status.textContent = !supported ? 'Microphone recording needs a supported browser on localhost or HTTPS.' : settings.reason || '';
     }
   }
   release(session) {
